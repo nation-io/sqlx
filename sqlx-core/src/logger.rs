@@ -6,9 +6,11 @@ use std::fmt::Debug;
 #[cfg(feature = "sqlite")]
 use std::hash::Hash;
 use std::time::Instant;
+use crate::postgres::PgArguments;
 
 pub(crate) struct QueryLogger<'q> {
     sql: &'q str,
+    args: Option<PgArguments>,
     rows_returned: u64,
     rows_affected: u64,
     start: Instant,
@@ -19,6 +21,18 @@ impl<'q> QueryLogger<'q> {
     pub(crate) fn new(sql: &'q str, settings: LogSettings) -> Self {
         Self {
             sql,
+            args: None,
+            rows_returned: 0,
+            rows_affected: 0,
+            start: Instant::now(),
+            settings,
+        }
+    }
+
+    pub(crate) fn new_with_args(sql: &'q str, args: Option<PgArguments>, settings: LogSettings) -> Self {
+        Self {
+            sql,
+            args: None,
             rows_returned: 0,
             rows_affected: 0,
             start: Instant::now(),
@@ -47,9 +61,10 @@ impl<'q> QueryLogger<'q> {
             .to_level()
             .filter(|lvl| log::log_enabled!(target: "sqlx::query", *lvl))
         {
-            let mut summary = parse_query_summary(&self.sql);
+            //let mut summary = parse_query_summary(&self.sql);
+            let mut summary = str::replace("\n", " ", &self.sql);
 
-            let sql = if summary != self.sql {
+            /*let sql = if summary != self.sql {
                 summary.push_str(" …");
                 format!(
                     "\n\n{}\n",
@@ -61,13 +76,13 @@ impl<'q> QueryLogger<'q> {
                 )
             } else {
                 String::new()
-            };
+            };*/
 
             log::logger().log(
                 &log::Record::builder()
                     .args(format_args!(
-                        "{}; rows affected: {}, rows returned: {}, elapsed: {:.3?}{}",
-                        summary, self.rows_affected, self.rows_returned, elapsed, sql
+                        "{}; rows affected: {}, rows returned: {}, elapsed: {:.3?}",
+                        summary, self.rows_affected, self.rows_returned, elapsed
                     ))
                     .level(lvl)
                     .module_path_static(Some("sqlx::query"))
